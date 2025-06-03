@@ -1,6 +1,7 @@
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 #include <stdexcept>
@@ -33,6 +34,11 @@ private:
         if(cols != row) throw invalid_argument("Matrix Dimensions are not Compatible For Multiplication: " +
                                                 std::to_string(rows) + "x" + std::to_string(cols) + " vs " +
                                                 std::to_string(row) + "x" + std::to_string(col));
+    }
+    
+    void checkSquare() const {
+        if(rows != cols) throw invalid_argument("Matrix should be Square (For Determinant/Inverse): " + 
+                                                std::to_string(rows) + "x" + std::to_string(cols));
     }
     
 public:
@@ -210,18 +216,68 @@ public:
     }
     
     // Transpose of Matrix
-    void transpose() {
+    Matrix& transpose() {
         Matrix<T> newMatrix(cols, rows);
+        vector<T> newMat(rows * cols);
         
         for(int i = 0; i < rows; ++i) {
             for(int j = 0; j < cols; ++j) {
-                newMatrix.getElement(j, i) = (*this).getElement(i, j);
+                newMat[j * rows + i] = getElement(i, j);
             }
         }
         
-        rows = newMatrix.rows;
-        cols = newMatrix.cols;
-        mat = newMatrix.mat;    
+        swap(rows, cols);
+        mat = move(newMat);  
+        return (*this);
+    }
+    
+    tuple<Matrix<T>, Matrix<T>> LU() const {
+        checkSquare();
+        
+        Matrix<T> lower(rows, cols), upper(rows, cols);
+        
+        for(int i = 0; i < rows; ++i) {
+            
+            for(int j = i; j < cols; ++j) {
+                
+                if(i == 0) upper.getElement(i, j) = getElement(i, j);
+                
+                T sum = 0;
+                
+                for(int k = 0; k < i; ++k) {
+                    sum += (lower.getElement(i, k) * upper.getElement(k, j));
+                }
+                
+                upper.getElement(i, j) = getElement(i, j) - sum;
+            }
+            
+            for(int j = i; j < cols; ++j) {
+                
+                if(i == j) lower.getElement(i, i) = 1;
+                else {
+                    T sum = 0;
+                    
+                    for(int k = 0; k < i; ++k) {
+                        sum += (lower.getElement(j, k) * upper.getElement(k, i));
+                    }
+                    
+                    lower.getElement(j, i) = (getElement(j, i) - sum) / upper.getElement(i, i);
+                    
+                }
+                
+            }
+            
+        }
+        
+        return make_tuple(lower, upper);
+        
+    }
+    
+    T determinant() const {
+        checkSquare();
+        
+        
+        
     }
     
 };
@@ -286,7 +342,14 @@ int main() {
 
         // Test invalid matrix multiplication (should throw exception)
         Matrix<int> mat9(2, 2);
-        mat6 * mat9; // 2x3 * 2x2 should throw
+        // mat6 * mat9; // 2x3 * 2x2 should throw
+        
+        Matrix<float> mat10(4, 4, 100);
+        
+        auto [lower, upper] = mat10.LU();
+        
+        cout << "Lower: " << '\n' << lower;
+        cout << "Upper: " << '\n' << upper;
         
 
     } catch (const std::invalid_argument& e) {
