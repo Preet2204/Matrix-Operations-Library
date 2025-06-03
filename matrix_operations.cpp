@@ -233,13 +233,14 @@ public:
     }
     
     // LU Decomposition
-    tuple<Matrix<T>, Matrix<T>, Matrix<T>> LU() const {
+    tuple<Matrix<T>, Matrix<T>, Matrix<T>, int> LU() const {
         checkSquare();
         
         Matrix<T> lower(rows, cols), upper(rows, cols);
         vector<int> perm(rows);
         vector<T> tempMat = mat;
-
+        int swapCount = 0;
+        
         // Initialize permutation vector and set L diagonal to 1
         for (int i = 0; i < rows; ++i) {
             perm[i] = i;
@@ -260,6 +261,7 @@ public:
             
             if (pivotRow != i) {
                 swap(perm[i], perm[pivotRow]);
+                swapCount++;
             }
             
             // Check for zero pivot (or near-zero for floating-point)
@@ -292,19 +294,21 @@ public:
             permMat.getElement(i, perm[i]) = 1.0;
         }
         
-        return make_tuple(lower, upper, permMat);
+        return make_tuple(lower, upper, permMat, swapCount);
     }
     
-    // Incomplete
+    // Compute Determinant
     T determinant() const {
         checkSquare();
         
-        auto [L, U, perm] = LU();
-        T determ = 1;
-        for(int i = 0; i < rows; ++i) {
-            determ = determ * U.getElement(i, i);
-        }
+        auto [L, U, perm, cnt] = LU();
         
+        T determ = 1;
+        if(cnt&1) determ = -1;
+        for(int i = 0; i < rows; ++i) {
+            determ = determ * U.mat[i * rows + i];
+        }
+
         return determ;
     }
     
@@ -375,7 +379,7 @@ int main() {
         mat6.transpose();
         cout << "Matrix 6 after transpose (3x2):" << endl << mat6;
 
-        // Test LU decomposition
+        // Test LU decomposition and determinant
         Matrix<double> mat9(3, 3);
         // Create a matrix: [1 2 3; 4 5 6; 7 8 10]
         mat9.getElement(0, 0) = 1; mat9.getElement(0, 1) = 2; mat9.getElement(0, 2) = 3;
@@ -383,19 +387,33 @@ int main() {
         mat9.getElement(2, 0) = 7; mat9.getElement(2, 1) = 8; mat9.getElement(2, 2) = 10;
         cout << "Matrix 9 (3x3) for LU decomposition:" << endl << mat9;
 
-        auto [L, U, perm] = mat9.LU();
+        auto [L, U, perm, swapCount] = mat9.LU();
         cout << "Lower triangular matrix L:" << endl << L;
         cout << "Upper triangular matrix U:" << endl << U;
-        cout << "Permutation Matrix: " << endl << perm;
+        cout << "Permutation Matrix:" << endl << perm;
 
-        double det = mat9.determinant();
+        Matrix<double> reconstructed = (perm * L) * U;
+        cout << "Reconstructed matrix (P * L * U):" << endl << reconstructed;
 
-        cout << "Determinant of Matrix 9: " << det << '\n';
+        cout << "Determinant of Matrix 9: " << mat9.determinant() << endl;
+
+        // Test determinant on a 2x2 matrix
+        Matrix<double> mat10(2, 2);
+        mat10.getElement(0, 0) = 3; mat10.getElement(0, 1) = 2;
+        mat10.getElement(1, 0) = 1; mat10.getElement(1, 1) = 4;
+        cout << "Matrix 10 (2x2):" << endl << mat10;
+        cout << "Determinant of Matrix 10: " << mat10.determinant() << endl;
+
+        // Test determinant on a singular matrix (should throw)
+        Matrix<double> mat11(2, 2, 0.0); // All zeros
+        cout << "Determinant of singular Matrix 11: " << mat11.determinant() << endl;
 
     } catch (const std::invalid_argument& e) {
         cout << "Invalid Argument Error: " << e.what() << endl;
     } catch (const std::out_of_range& e) {
         cout << "Out of Range Error: " << e.what() << endl;
+    } catch (const std::runtime_error& e) {
+        cout << "Runtime Error: " << e.what() << endl;
     } catch (...) {
         cout << "Unknown Error occurred" << endl;
     }
