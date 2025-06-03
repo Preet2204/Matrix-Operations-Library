@@ -1,119 +1,149 @@
-#include <cstddef>
-#include <iostream>
-#include <ostream>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <vector>
-#include <stdexcept>
-#include <iomanip>
+#ifndef MATRIX_HPP
+#define MATRIX_HPP
+
+#include <cstddef>      // For size_t
+#include <iosfwd>       // For std::ostream (forward declaration)
+#include <iomanip>      // For std::setw
+#include <string>       // For std::string, std::to_string
+#include <tuple>        // For std::tuple
+#include <vector>       // For std::vector
+#include <type_traits>  // For std::is_arithmetic_v, std::is_same_v
+#include <stdexcept>    // For std::out_of_range, std::invalid_argument, std::runtime_error
 using namespace std;
 
-template<typename T> class Matrix {
-    static_assert(is_arithmetic_v<T> && !is_same_v<T, bool>, "Matrix can only be instantiated with numeric (arithmetic, non bool) Types.");
+template<typename T>
+class Matrix {
+    static_assert(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>,
+                  "Matrix can only be instantiated with numeric (arithmetic, non-bool) types.");
+
 private:
-    int rows;
-    int cols;
-    vector<T> mat;
+    int rows;           // Number of rows in the matrix
+    int cols;           // Number of columns in the matrix
+    std::vector<T> mat; // 1D vector storing matrix elements in row-major order
     
 private:
+    // Check if indices i, j are within bounds; throw if not
     void checkBounds(int i, int j) const {
-        if(i < 0 || i >= rows || j < 0 || j >= cols) {
-            throw out_of_range("Matrix Index Out of Bounds: i=" + to_string(i) + ", j=" + to_string(j));
+        if (i < 0 || i >= rows || j < 0 || j >= cols) {
+            throw std::out_of_range("Matrix Index Out of Bounds: i=" + std::to_string(i) +
+                                    ", j=" + std::to_string(j));
         }
     }
-    
+
+    // Check if dimensions match for addition/subtraction; throw if not
     void checkCompatibility(int row, int col) const {
-        if(row != rows || col != cols) {
-            throw invalid_argument("Both Matrix's Dimensions must be same (For Operations +, -): " +
-                                    std::to_string(rows) + "x" + std::to_string(cols) + " vs " +
-                                    std::to_string(row) + "x" + std::to_string(col));
+        if (row != rows || col != cols) {
+            throw std::invalid_argument("Both Matrix's Dimensions must be same (For Operations +, -): " +
+                                        std::to_string(rows) + "x" + std::to_string(cols) + " vs " +
+                                        std::to_string(row) + "x" + std::to_string(col));
         }
     }
-    
+
+    // Check if dimensions are compatible for multiplication; throw if not
     void checkMultiplicationCompatibility(int row, int col) const {
-        if(cols != row) throw invalid_argument("Matrix Dimensions are not Compatible For Multiplication: " +
-                                                std::to_string(rows) + "x" + std::to_string(cols) + " vs " +
-                                                std::to_string(row) + "x" + std::to_string(col));
+        if (cols != row) {
+            throw std::invalid_argument("Matrix Dimensions are not Compatible For Multiplication: " +
+                                        std::to_string(rows) + "x" + std::to_string(cols) + " vs " +
+                                        std::to_string(row) + "x" + std::to_string(col));
+        }
     }
-    
+
+    // Check if the matrix is square (rows == cols); throw if not
     void checkSquare() const {
-        if(rows != cols) throw invalid_argument("Matrix should be Square (For Determinant/Inverse): " + 
-                                                std::to_string(rows) + "x" + std::to_string(cols));
+        if (rows != cols) {
+            throw std::invalid_argument("Matrix should be Square (For Determinant/Inverse): " +
+                                        std::to_string(rows) + "x" + std::to_string(cols));
+        }
     }
-    
+
+    // Check if the matrix is invertible (square and non-singular); throw if not
+    void checkInverse() const {
+        checkSquare();
+        if (determinant() == 0) {
+            throw std::invalid_argument("Matrix cannot be singular (For Inverse).");
+        }
+    }
+
 public:
+    // Get the number of rows
     int getRows() const {
         return rows;
     }
-    
+
+    // Get the number of columns
     int getCols() const {
         return cols;
     }
 
+    // Copy constructor
     Matrix(const Matrix& other) : rows(other.rows), cols(other.cols), mat(other.mat) {}
-    
+
+    // Construct a matrix of size row x col, initialized to 0
     Matrix(int row, int col) {
-        if(row <= 0 || col <= 0) {
-            throw invalid_argument("Matrix dimensions must be positive");
+        if (row <= 0 || col <= 0) {
+            throw std::invalid_argument("Matrix dimensions must be positive");
         }
         rows = row;
         cols = col;
-        mat.resize(rows*cols, 0);
+        mat.resize(rows * cols, 0);
     }
 
+    // Construct a matrix of size row x col, initialized to val
     Matrix(int row, int col, T val) {
-        if(row <= 0 || col <= 0) {
-            throw invalid_argument("Matrix dimensions must be positive");
+        if (row <= 0 || col <= 0) {
+            throw std::invalid_argument("Matrix dimensions must be positive");
         }
         rows = row;
         cols = col;
-        mat.resize(rows*cols, val);
+        mat.resize(rows * cols, val);
     }
-    
-    Matrix(vector<vector<T>> val) {
-        if(val.empty()) {
-            throw invalid_argument("Input Vector should not be empty.");
+
+    // Construct a matrix from a 2D vector
+    Matrix(std::vector<std::vector<T>> val) {
+        if (val.empty()) {
+            throw std::invalid_argument("Input Vector should not be empty.");
         }
-        
+
         size_t expectedCols = val[0].size();
-        for(size_t i = 1; i < val.size(); ++i) {
-            if(val[i].size() != expectedCols) {
-                throw invalid_argument("Input Vector should have consistent number of cols.");
+        for (size_t i = 1; i < val.size(); ++i) {
+            if (val[i].size() != expectedCols) {
+                throw std::invalid_argument("Input Vector should have consistent number of cols.");
             }
         }
-        
-        rows = val.size();
-        cols = val[0].size();
+
+        rows = static_cast<int>(val.size());
+        cols = static_cast<int>(val[0].size());
         mat.resize(rows * cols);
-        for(int i = 0; i < rows; ++i) {
-            for(int j = 0; j < cols; ++j) {
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < cols; ++j) {
                 mat[i * cols + j] = val[i][j];
             }
         }
     }
-    
+
+    // Get a reference to element at (i, j); throws if out of bounds
     T& getElement(int i, int j) {
         checkBounds(i, j);
         return mat[i * cols + j];
     }
 
+    // Get a const reference to element at (i, j); throws if out of bounds
     const T& getElement(int i, int j) const {
         checkBounds(i, j);
         return mat[i * cols + j];
     }
 
-    // Assignment = Operator
+    // Assignment operator
     Matrix& operator=(const Matrix& other) {
-        if(this != &other) {
+        if (this != &other) {
             rows = other.rows;
             cols = other.cols;
             mat = other.mat;
         }
         return *this;
     }
-    
-    // Addition + Operator
+
+    // Addition operator: returns a new matrix (this + other)
     Matrix operator+(const Matrix& other) const {
         checkCompatibility(other.getRows(), other.getCols());
         Matrix<T> newMatrix(rows, cols);
@@ -124,8 +154,8 @@ public:
         }
         return newMatrix;
     }
-    
-    // Addition += Operator
+
+    // Addition assignment operator: modifies this matrix
     Matrix& operator+=(const Matrix& other) {
         checkCompatibility(other.getRows(), other.getCols());
         for (int i = 0; i < rows; ++i) {
@@ -133,10 +163,10 @@ public:
                 getElement(i, j) += other.getElement(i, j);
             }
         }
-        return (*this);
+        return *this;
     }
-    
-    // Subtraction - Operator
+
+    // Subtraction operator: returns a new matrix (this - other)
     Matrix operator-(const Matrix& other) const {
         checkCompatibility(other.getRows(), other.getCols());
         Matrix<T> newMatrix(rows, cols);
@@ -147,8 +177,8 @@ public:
         }
         return newMatrix;
     }
-    
-    // Subtraction -= Operator
+
+    // Subtraction assignment operator: modifies this matrix
     Matrix& operator-=(const Matrix& other) {
         checkCompatibility(other.getRows(), other.getCols());
         for (int i = 0; i < rows; ++i) {
@@ -156,10 +186,10 @@ public:
                 getElement(i, j) -= other.getElement(i, j);
             }
         }
-        return (*this);
+        return *this;
     }
-    
-    // Scalar Multiplication * Operator
+
+    // Scalar multiplication operator: returns a new matrix (this * scale)
     Matrix operator*(const T& scale) const {
         Matrix<T> newMatrix(rows, cols);
         for (int i = 0; i < rows; ++i) {
@@ -170,42 +200,42 @@ public:
         return newMatrix;
     }
 
-    // Scalar Multiplication *= Operator
+    // Scalar multiplication assignment operator: modifies this matrix
     Matrix& operator*=(const T& scale) {
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                (*this).getElement(i, j) *= scale;
+                getElement(i, j) *= scale;
             }
         }
-        return (*this);
+        return *this;
     }
-    
-    // Matrix Multiplication * Operator
+
+    // Matrix multiplication operator: returns a new matrix (this * other)
     Matrix operator*(const Matrix& other) const {
         checkMultiplicationCompatibility(other.getRows(), other.getCols());
         Matrix<T> newMatrix(rows, other.getCols());
 
-        for(int i = 0; i < rows; ++i) {
-            for(int j = 0; j < other.getCols(); ++j) {
-                float sum = 0;
-                for(int k = 0; k < cols; ++k) {
-                    sum += (*this).getElement(i, k) * other.getElement(k, j);
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < other.getCols(); ++j) {
+                T sum = 0;
+                for (int k = 0; k < cols; ++k) {
+                    sum += getElement(i, k) * other.getElement(k, j);
                 }
                 newMatrix.getElement(i, j) = sum;
             }
         }
         return newMatrix;
     }
-    
-    // Matrix Multiplication *= Operator
+
+    // Matrix multiplication assignment operator: modifies this matrix
     Matrix& operator*=(const Matrix& other) {
         checkMultiplicationCompatibility(other.getRows(), other.getCols());
         Matrix<T> newMatrix(rows, other.getCols());
-        for(int i = 0; i < rows; ++i) {
-            for(int j = 0; j < other.getCols(); ++j) {
-                float sum = 0;
-                for(int k = 0; k < cols; ++k) {
-                    sum += (*this).getElement(i, k) * other.getElement(k, j);
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < other.getCols(); ++j) {
+                T sum = 0;
+                for (int k = 0; k < cols; ++k) {
+                    sum += getElement(i, k) * other.getElement(k, j);
                 }
                 newMatrix.getElement(i, j) = sum;
             }
@@ -213,34 +243,31 @@ public:
         rows = newMatrix.rows;
         cols = newMatrix.cols;
         mat = newMatrix.mat;
-        return (*this);
+        return *this;
     }
     
-    // Transpose of Matrix
+    // Transpose the matrix in place: swaps rows and columns
     Matrix& transpose() {
-        Matrix<T> newMatrix(cols, rows);
-        vector<T> newMat(rows * cols);
-        
-        for(int i = 0; i < rows; ++i) {
-            for(int j = 0; j < cols; ++j) {
+        std::vector<T> newMat(rows * cols);
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < cols; ++j) {
                 newMat[j * rows + i] = getElement(i, j);
             }
         }
-        
-        swap(rows, cols);
+        std::swap(rows, cols);
         mat = std::move(newMat);
-        return (*this);
+        return *this;
     }
-    
-    // LU Decomposition
-    tuple<Matrix<T>, Matrix<T>, Matrix<T>, int> LU() const {
+
+    // Perform LU decomposition: returns (L, U, P, swapCount) where PA = LU
+    std::tuple<Matrix<T>, Matrix<T>, Matrix<T>, int> LU() const {
         checkSquare();
-        
+
         Matrix<T> lower(rows, cols), upper(rows, cols);
-        vector<int> perm(rows);
-        vector<T> tempMat = mat;
+        std::vector<int> perm(rows);
+        std::vector<T> tempMat = mat;
         int swapCount = 0;
-        
+
         // Initialize permutation vector and set L diagonal to 1
         for (int i = 0; i < rows; ++i) {
             perm[i] = i;
@@ -248,29 +275,31 @@ public:
         }
 
         for (int i = 0; i < rows; ++i) {
-            // Partial pivoting: Find the row with the largest element in column i
+            // Partial pivoting: find row with largest element in column i
             int pivotRow = i;
-            T pivotVal = abs(tempMat[perm[i] * cols + i]);
+            T pivotVal = std::abs(tempMat[perm[i] * cols + i]);
             for (int k = i + 1; k < rows; ++k) {
-                T val = abs(tempMat[perm[k] * cols + i]);
+                T val = std::abs(tempMat[perm[k] * cols + i]);
                 if (val > pivotVal) {
                     pivotVal = val;
                     pivotRow = k;
                 }
             }
-            
+
+            // Swap rows if necessary
             if (pivotRow != i) {
-                swap(perm[i], perm[pivotRow]);
-                swapCount++;
-            }
-            
-            // Check for zero pivot (or near-zero for floating-point)
-            T pivot = tempMat[perm[i] * cols + i];
-            if (abs(pivot) < 1e-10) {
-                throw runtime_error("LU decomposition failed: Matrix is singular or near-singular (pivot near zero at position " + to_string(i) + ")");
+                std::swap(perm[i], perm[pivotRow]);
+                ++swapCount;
             }
 
-            // Compute U's row i (using permuted rows)
+            // Check for singular or near-singular matrix
+            T pivot = tempMat[perm[i] * cols + i];
+            if (std::abs(pivot) < 1e-10) {
+                throw std::runtime_error("LU decomposition failed: Matrix is singular or near-singular (pivot near zero at position " +
+                                            std::to_string(i) + ")");
+            }
+
+            // Compute U's row i
             for (int j = i; j < cols; ++j) {
                 T sum = 0;
                 for (int k = 0; k < i; ++k) {
@@ -278,7 +307,7 @@ public:
                 }
                 upper.mat[i * cols + j] = tempMat[perm[i] * cols + j] - sum;
             }
-            
+
             // Compute L's column i below the diagonal
             for (int j = i + 1; j < rows; ++j) {
                 T sum = 0;
@@ -289,134 +318,94 @@ public:
             }
         }
 
-        Matrix<T> permMat(rows, cols); // Permutation matrix
+        // Create permutation matrix P
+        Matrix<T> permMat(rows, cols);
         for (int i = 0; i < rows; ++i) {
             permMat.getElement(i, perm[i]) = 1.0;
         }
-        
-        return make_tuple(lower, upper, permMat, swapCount);
+
+        return std::make_tuple(lower, upper, permMat, swapCount);
     }
-    
-    // Compute Determinant
+
+    // Compute the determinant using LU decomposition
     T determinant() const {
         checkSquare();
-        
-        auto [L, U, perm, cnt] = LU();
-        
+
+        auto [L, U, perm, swapCount] = LU();
+
         T determ = 1;
-        if(cnt&1) determ = -1;
-        for(int i = 0; i < rows; ++i) {
-            determ = determ * U.mat[i * rows + i];
+        // Adjust sign based on number of swaps
+        if (swapCount % 2 == 1) {
+            determ = -1;
+        }
+        // Multiply diagonal elements of U
+        for (int i = 0; i < rows; ++i) {
+            determ *= U.mat[i * rows + i];
         }
 
         return determ;
     }
     
+    // Compute the inverse using LU decomposition with forward/back substitution
+    Matrix inverse() const {
+        checkInverse();
+
+        auto [L, U, P, swapCount] = LU();
+
+        // Compute P^T (transpose of permutation matrix)
+        Matrix<T> PT = P;
+        PT.transpose();
+
+        // Solve L Y = P^T for Y (forward substitution)
+        Matrix<T> Y(rows, rows);
+        for (int j = 0; j < rows; ++j) {
+            for (int i = 0; i < rows; ++i) {
+                T sum = 0;
+                for (int k = 0; k < i; ++k) {
+                    sum += L.mat[i * cols + k] * Y.mat[k * cols + j];
+                }
+                Y.mat[i * cols + j] = PT.mat[i * cols + j] - sum;
+            }
+        }
+
+        // Solve U X = Y for X (back substitution), where X is the inverse
+        Matrix<T> X(rows, rows);
+        for (int j = 0; j < rows; ++j) {
+            for (int i = rows - 1; i >= 0; --i) {
+                T sum = 0;
+                for (int k = i + 1; k < rows; ++k) {
+                    sum += U.mat[i * cols + k] * X.mat[k * cols + j];
+                }
+                X.mat[i * cols + j] = (Y.mat[i * cols + j] - sum) / U.mat[i * cols + i];
+            }
+        }
+        
+        return X;
+    }
 };
 
+// Non-member scalar multiplication: scale * matrix
 template<typename T>
 Matrix<T> operator*(const T& scale, const Matrix<T>& mat) {
     Matrix<T> newMatrix(mat.getRows(), mat.getCols());
-    for(int i = 0; i < mat.getRows(); ++i) {
-        for(int j = 0; j < mat.getCols(); ++j) {
+    for (int i = 0; i < mat.getRows(); ++i) {
+        for (int j = 0; j < mat.getCols(); ++j) {
             newMatrix.getElement(i, j) = scale * mat.getElement(i, j);
         }
     }
     return newMatrix;
 }
 
+// Output operator: prints the matrix to an output stream
 template<typename T>
-ostream& operator<<(ostream& stream, const Matrix<T>& mat) {
-    for(int i = 0; i < mat.getRows(); ++i) {
-        for(int j = 0; j < mat.getCols(); ++j) {
-            stream << setw(4) << mat.getElement(i, j) << ' ';
+std::ostream& operator<<(std::ostream& stream, const Matrix<T>& mat) {
+    for (int i = 0; i < mat.getRows(); ++i) {
+        for (int j = 0; j < mat.getCols(); ++j) {
+            stream << std::setw(10) << mat.getElement(i, j) << ' ';
         }
         stream << '\n';
     }
     return stream;
 }
 
-int main() {
-    
-    try {
-
-        // Test matrix construction and addition/subtraction
-        Matrix<double> mat1(2, 2, 1.0); // 2x2 matrix, all 1s
-        Matrix<double> mat2(2, 2, 2.0); // 2x2 matrix, all 2s
-        cout << "Matrix 1:" << endl << mat1;
-        cout << "Matrix 2:" << endl << mat2;
-
-        Matrix<double> mat3 = mat1 + mat2;
-        cout << "Matrix 1 + Matrix 2:" << endl << mat3;
-
-        mat3 -= mat1;
-        cout << "Matrix 3 - Matrix 1:" << endl << mat3;
-
-        // Test scalar multiplication (Matrix * T and T * Matrix)
-        Matrix<double> mat4 = mat1 * 3.0;
-        cout << "Matrix 1 * 3:" << endl << mat4;
-
-        Matrix<double> mat5 = 4.0 * mat1;
-        cout << "4 * Matrix 1:" << endl << mat5;
-
-        mat5 *= 2.0;
-        cout << "Matrix 5 *= 2:" << endl << mat5;
-
-        // Test matrix multiplication
-        Matrix<double> mat6(2, 3, 1.0); // 2x3 matrix, all 1s
-        Matrix<double> mat7(3, 2, 2.0); // 3x2 matrix, all 2s
-        cout << "Matrix 6 (2x3):" << endl << mat6;
-        cout << "Matrix 7 (3x2):" << endl << mat7;
-
-        Matrix<double> mat8 = mat6 * mat7;
-        cout << "Matrix 6 * Matrix 7:" << endl << mat8;
-
-        // mat8 *= mat7;
-        // cout << "Matrix 8 *= Matrix 7:" << endl << mat8;
-
-        // Test transpose
-        cout << "Matrix 6 before transpose:" << endl << mat6;
-        mat6.transpose();
-        cout << "Matrix 6 after transpose (3x2):" << endl << mat6;
-
-        // Test LU decomposition and determinant
-        Matrix<double> mat9(3, 3);
-        // Create a matrix: [1 2 3; 4 5 6; 7 8 10]
-        mat9.getElement(0, 0) = 1; mat9.getElement(0, 1) = 2; mat9.getElement(0, 2) = 3;
-        mat9.getElement(1, 0) = 4; mat9.getElement(1, 1) = 5; mat9.getElement(1, 2) = 6;
-        mat9.getElement(2, 0) = 7; mat9.getElement(2, 1) = 8; mat9.getElement(2, 2) = 10;
-        cout << "Matrix 9 (3x3) for LU decomposition:" << endl << mat9;
-
-        auto [L, U, perm, swapCount] = mat9.LU();
-        cout << "Lower triangular matrix L:" << endl << L;
-        cout << "Upper triangular matrix U:" << endl << U;
-        cout << "Permutation Matrix:" << endl << perm;
-
-        Matrix<double> reconstructed = (perm * L) * U;
-        cout << "Reconstructed matrix (P * L * U):" << endl << reconstructed;
-
-        cout << "Determinant of Matrix 9: " << mat9.determinant() << endl;
-
-        // Test determinant on a 2x2 matrix
-        Matrix<double> mat10(2, 2);
-        mat10.getElement(0, 0) = 3; mat10.getElement(0, 1) = 2;
-        mat10.getElement(1, 0) = 1; mat10.getElement(1, 1) = 4;
-        cout << "Matrix 10 (2x2):" << endl << mat10;
-        cout << "Determinant of Matrix 10: " << mat10.determinant() << endl;
-
-        // Test determinant on a singular matrix (should throw)
-        Matrix<double> mat11(2, 2, 0.0); // All zeros
-        cout << "Determinant of singular Matrix 11: " << mat11.determinant() << endl;
-
-    } catch (const std::invalid_argument& e) {
-        cout << "Invalid Argument Error: " << e.what() << endl;
-    } catch (const std::out_of_range& e) {
-        cout << "Out of Range Error: " << e.what() << endl;
-    } catch (const std::runtime_error& e) {
-        cout << "Runtime Error: " << e.what() << endl;
-    } catch (...) {
-        cout << "Unknown Error occurred" << endl;
-    }
-    
-    return 0;
-}
+#endif
