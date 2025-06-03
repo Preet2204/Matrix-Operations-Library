@@ -9,7 +9,6 @@
 #include <vector>       // For std::vector
 #include <type_traits>  // For std::is_arithmetic_v, std::is_same_v
 #include <stdexcept>    // For std::out_of_range, std::invalid_argument, std::runtime_error
-using namespace std;
 
 template<typename T>
 class Matrix {
