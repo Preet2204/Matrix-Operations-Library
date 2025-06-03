@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <iostream>
 #include <ostream>
 #include <string>
@@ -227,57 +228,84 @@ public:
         }
         
         swap(rows, cols);
-        mat = move(newMat);  
+        mat = std::move(newMat);
         return (*this);
     }
     
-    tuple<Matrix<T>, Matrix<T>> LU() const {
+    // LU Decomposition
+    tuple<Matrix<T>, Matrix<T>, Matrix<T>> LU() const {
         checkSquare();
         
         Matrix<T> lower(rows, cols), upper(rows, cols);
-        
-        for(int i = 0; i < rows; ++i) {
+        vector<int> perm(rows);
+        vector<T> tempMat = mat;
+
+        // Initialize permutation vector and set L diagonal to 1
+        for (int i = 0; i < rows; ++i) {
+            perm[i] = i;
+            lower.mat[i * cols + i] = 1;
+        }
+
+        for (int i = 0; i < rows; ++i) {
+            // Partial pivoting: Find the row with the largest element in column i
+            int pivotRow = i;
+            T pivotVal = abs(tempMat[perm[i] * cols + i]);
+            for (int k = i + 1; k < rows; ++k) {
+                T val = abs(tempMat[perm[k] * cols + i]);
+                if (val > pivotVal) {
+                    pivotVal = val;
+                    pivotRow = k;
+                }
+            }
             
-            for(int j = i; j < cols; ++j) {
-                
-                if(i == 0) upper.getElement(i, j) = getElement(i, j);
-                
+            if (pivotRow != i) {
+                swap(perm[i], perm[pivotRow]);
+            }
+            
+            // Check for zero pivot (or near-zero for floating-point)
+            T pivot = tempMat[perm[i] * cols + i];
+            if (abs(pivot) < 1e-10) {
+                throw runtime_error("LU decomposition failed: Matrix is singular or near-singular (pivot near zero at position " + to_string(i) + ")");
+            }
+
+            // Compute U's row i (using permuted rows)
+            for (int j = i; j < cols; ++j) {
                 T sum = 0;
-                
-                for(int k = 0; k < i; ++k) {
-                    sum += (lower.getElement(i, k) * upper.getElement(k, j));
+                for (int k = 0; k < i; ++k) {
+                    sum += lower.mat[i * cols + k] * upper.mat[k * cols + j];
                 }
-                
-                upper.getElement(i, j) = getElement(i, j) - sum;
+                upper.mat[i * cols + j] = tempMat[perm[i] * cols + j] - sum;
             }
             
-            for(int j = i; j < cols; ++j) {
-                
-                if(i == j) lower.getElement(i, i) = 1;
-                else {
-                    T sum = 0;
-                    
-                    for(int k = 0; k < i; ++k) {
-                        sum += (lower.getElement(j, k) * upper.getElement(k, i));
-                    }
-                    
-                    lower.getElement(j, i) = (getElement(j, i) - sum) / upper.getElement(i, i);
-                    
+            // Compute L's column i below the diagonal
+            for (int j = i + 1; j < rows; ++j) {
+                T sum = 0;
+                for (int k = 0; k < i; ++k) {
+                    sum += lower.mat[j * cols + k] * upper.mat[k * cols + i];
                 }
-                
+                lower.mat[j * cols + i] = (tempMat[perm[j] * cols + i] - sum) / upper.mat[i * cols + i];
             }
-            
+        }
+
+        Matrix<T> permMat(rows, cols); // Permutation matrix
+        for (int i = 0; i < rows; ++i) {
+            permMat.getElement(i, perm[i]) = 1.0;
         }
         
-        return make_tuple(lower, upper);
-        
+        return make_tuple(lower, upper, permMat);
     }
     
+    // Incomplete
     T determinant() const {
         checkSquare();
         
+        auto [L, U, perm] = LU();
+        T determ = 1;
+        for(int i = 0; i < rows; ++i) {
+            determ = determ * U.getElement(i, i);
+        }
         
-        
+        return determ;
     }
     
 };
@@ -308,49 +336,61 @@ int main() {
     
     try {
 
-        Matrix<int> mat1(2, 2, 1); // 2x2 matrix, all 1s
-        Matrix<int> mat2(2, 2, 2); // 2x2 matrix, all 2s
+        // Test matrix construction and addition/subtraction
+        Matrix<double> mat1(2, 2, 1.0); // 2x2 matrix, all 1s
+        Matrix<double> mat2(2, 2, 2.0); // 2x2 matrix, all 2s
         cout << "Matrix 1:" << endl << mat1;
         cout << "Matrix 2:" << endl << mat2;
 
-        Matrix<int> mat3 = mat1 + mat2;
+        Matrix<double> mat3 = mat1 + mat2;
         cout << "Matrix 1 + Matrix 2:" << endl << mat3;
 
         mat3 -= mat1;
         cout << "Matrix 3 - Matrix 1:" << endl << mat3;
 
-        Matrix<int> mat4 = mat1 * 3;
+        // Test scalar multiplication (Matrix * T and T * Matrix)
+        Matrix<double> mat4 = mat1 * 3.0;
         cout << "Matrix 1 * 3:" << endl << mat4;
 
-        Matrix<int> mat5 = 4 * mat1;
+        Matrix<double> mat5 = 4.0 * mat1;
         cout << "4 * Matrix 1:" << endl << mat5;
 
-        mat5 *= 2;
+        mat5 *= 2.0;
         cout << "Matrix 5 *= 2:" << endl << mat5;
 
         // Test matrix multiplication
-        Matrix<int> mat6(2, 3, 1); // 2x3 matrix, all 1s
-        Matrix<int> mat7(3, 2, 2); // 3x2 matrix, all 2s
+        Matrix<double> mat6(2, 3, 1.0); // 2x3 matrix, all 1s
+        Matrix<double> mat7(3, 2, 2.0); // 3x2 matrix, all 2s
         cout << "Matrix 6 (2x3):" << endl << mat6;
         cout << "Matrix 7 (3x2):" << endl << mat7;
 
-        Matrix<int> mat8 = mat6 * mat7;
+        Matrix<double> mat8 = mat6 * mat7;
         cout << "Matrix 6 * Matrix 7:" << endl << mat8;
 
-        mat8 *= mat7;
-        cout << "Matrix 8 *= Matrix 7:" << endl << mat8;
+        // mat8 *= mat7;
+        // cout << "Matrix 8 *= Matrix 7:" << endl << mat8;
 
-        // Test invalid matrix multiplication (should throw exception)
-        Matrix<int> mat9(2, 2);
-        // mat6 * mat9; // 2x3 * 2x2 should throw
-        
-        Matrix<float> mat10(4, 4, 100);
-        
-        auto [lower, upper] = mat10.LU();
-        
-        cout << "Lower: " << '\n' << lower;
-        cout << "Upper: " << '\n' << upper;
-        
+        // Test transpose
+        cout << "Matrix 6 before transpose:" << endl << mat6;
+        mat6.transpose();
+        cout << "Matrix 6 after transpose (3x2):" << endl << mat6;
+
+        // Test LU decomposition
+        Matrix<double> mat9(3, 3);
+        // Create a matrix: [1 2 3; 4 5 6; 7 8 10]
+        mat9.getElement(0, 0) = 1; mat9.getElement(0, 1) = 2; mat9.getElement(0, 2) = 3;
+        mat9.getElement(1, 0) = 4; mat9.getElement(1, 1) = 5; mat9.getElement(1, 2) = 6;
+        mat9.getElement(2, 0) = 7; mat9.getElement(2, 1) = 8; mat9.getElement(2, 2) = 10;
+        cout << "Matrix 9 (3x3) for LU decomposition:" << endl << mat9;
+
+        auto [L, U, perm] = mat9.LU();
+        cout << "Lower triangular matrix L:" << endl << L;
+        cout << "Upper triangular matrix U:" << endl << U;
+        cout << "Permutation Matrix: " << endl << perm;
+
+        double det = mat9.determinant();
+
+        cout << "Determinant of Matrix 9: " << det << '\n';
 
     } catch (const std::invalid_argument& e) {
         cout << "Invalid Argument Error: " << e.what() << endl;
