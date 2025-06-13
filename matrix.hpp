@@ -1,6 +1,7 @@
 #ifndef MATRIX_HPP
 #define MATRIX_HPP
 
+#include <cmath>
 #include <cstddef>      // For size_t
 #include <iosfwd>       // For std::ostream (forward declaration)
 #include <iomanip>      // For std::setw
@@ -30,7 +31,7 @@ private:
     }
 
     // Check if dimensions match for addition/subtraction; throw if not
-    void checkCompatibility(int row, int col) const {
+    void checkAdditionCompatibility(int row, int col) const {
         if (row != rows || col != cols) {
             throw std::invalid_argument("Both Matrix's Dimensions must be same (For Operations +, -): " +
                                         std::to_string(rows) + "x" + std::to_string(cols) + " vs " +
@@ -57,9 +58,15 @@ private:
 
     // Check if the matrix is invertible (square and non-singular); throw if not
     void checkInverse() const {
-        checkSquare();
+        // checkSquare();       // Square is being checked in determinant()
         if (determinant() == 0) {
             throw std::invalid_argument("Matrix cannot be singular (For Inverse).");
+        }
+    }
+    
+    void checkDimensions(int row, int col) {
+        if (row <= 0 || col <= 0) {
+            throw std::invalid_argument("Matrix dimensions must be positive");
         }
     }
 
@@ -74,14 +81,36 @@ public:
         return cols;
     }
 
+    // Get ith row in Vector Form
+    std::vector<T> getRow(int i) const {
+        checkBounds(i, 0);
+        std::vector<T> vec;
+        
+        for(int j = 0; j < cols; ++j) {
+            vec.push_back(mat[i * cols + j]);
+        }
+        
+        return vec;
+    }
+    
+    // Get jth column in Vector Form
+    std::vector<T> getCol(int j) const {
+        checkBounds(0, j);
+        std::vector<T> vec;
+        
+        for(int i = 0; i < rows; ++i) {
+            vec.push_back(mat[i * cols + j]);
+        }
+
+        return vec;
+    }
+
     // Copy constructor
     Matrix(const Matrix& other) : rows(other.rows), cols(other.cols), mat(other.mat) {}
 
     // Construct a matrix of size row x col, initialized to 0
     Matrix(int row, int col) {
-        if (row <= 0 || col <= 0) {
-            throw std::invalid_argument("Matrix dimensions must be positive");
-        }
+        checkDimensions(row, col);
         rows = row;
         cols = col;
         mat.resize(rows * cols, 0);
@@ -89,9 +118,7 @@ public:
 
     // Construct a matrix of size row x col, initialized to val
     Matrix(int row, int col, T val) {
-        if (row <= 0 || col <= 0) {
-            throw std::invalid_argument("Matrix dimensions must be positive");
-        }
+        checkDimensions(row, col);
         rows = row;
         cols = col;
         mat.resize(rows * cols, val);
@@ -144,11 +171,11 @@ public:
 
     // Addition operator: returns a new matrix (this + other)
     Matrix operator+(const Matrix& other) const {
-        checkCompatibility(other.getRows(), other.getCols());
+        checkAdditionCompatibility(other.rows, other.cols);
         Matrix<T> newMatrix(rows, cols);
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                newMatrix.getElement(i, j) = getElement(i, j) + other.getElement(i, j);
+                newMatrix.mat[i * cols + j] = mat[i * cols + j] + other.mat[i * cols + j];
             }
         }
         return newMatrix;
@@ -156,10 +183,10 @@ public:
 
     // Addition assignment operator: modifies this matrix
     Matrix& operator+=(const Matrix& other) {
-        checkCompatibility(other.getRows(), other.getCols());
+        checkAdditionCompatibility(other.rows, other.cols);
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                getElement(i, j) += other.getElement(i, j);
+                mat[i * cols + j] += other.mat[i * cols + j];
             }
         }
         return *this;
@@ -167,11 +194,11 @@ public:
 
     // Subtraction operator: returns a new matrix (this - other)
     Matrix operator-(const Matrix& other) const {
-        checkCompatibility(other.getRows(), other.getCols());
+        checkAdditionCompatibility(other.rows, other.cols);
         Matrix<T> newMatrix(rows, cols);
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                newMatrix.getElement(i, j) = getElement(i, j) - other.getElement(i, j);
+                newMatrix.mat[i * cols + j] = mat[i * cols + j] - other.mat[i * cols + j];
             }
         }
         return newMatrix;
@@ -179,10 +206,10 @@ public:
 
     // Subtraction assignment operator: modifies this matrix
     Matrix& operator-=(const Matrix& other) {
-        checkCompatibility(other.getRows(), other.getCols());
+        checkAdditionCompatibility(other.rows, other.cols);
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                getElement(i, j) -= other.getElement(i, j);
+                mat[i * cols + j] -= other.mat[i * cols + j];
             }
         }
         return *this;
@@ -190,12 +217,14 @@ public:
 
     // Scalar multiplication operator: returns a new matrix (this * scale)
     Matrix operator*(const T& scale) const {
-        Matrix<T> newMatrix(rows, cols);
+        std::vector<T> newMat(rows * cols);
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                newMatrix.getElement(i, j) = getElement(i, j) * scale;
+                newMat[i * cols + j] = mat[i * cols + j] * scale;
             }
         }
+        Matrix<T> newMatrix(rows, cols);
+        newMatrix.mat = newMat;
         return newMatrix;
     }
 
@@ -203,7 +232,7 @@ public:
     Matrix& operator*=(const T& scale) {
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                getElement(i, j) *= scale;
+                mat[i * cols + j] *= scale;
             }
         }
         return *this;
@@ -211,46 +240,48 @@ public:
 
     // Matrix multiplication operator: returns a new matrix (this * other)
     Matrix operator*(const Matrix& other) const {
-        checkMultiplicationCompatibility(other.getRows(), other.getCols());
-        Matrix<T> newMatrix(rows, other.getCols());
+        checkMultiplicationCompatibility(other.rows, other.cols);
+        std::vector<T> newMat(rows * other.cols);
 
         for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < other.getCols(); ++j) {
+            for (int j = 0; j < other.cols; ++j) {
                 T sum = 0;
                 for (int k = 0; k < cols; ++k) {
-                    sum += getElement(i, k) * other.getElement(k, j);
+                    sum += mat[i * cols + k] * other.mat[k * other.cols + j];
                 }
-                newMatrix.getElement(i, j) = sum;
+                newMat[i * other.cols + j] = sum;
             }
         }
+
+        Matrix<T> newMatrix(rows, other.cols);
+        newMatrix.mat = newMat;
         return newMatrix;
     }
 
     // Matrix multiplication assignment operator: modifies this matrix
     Matrix& operator*=(const Matrix& other) {
-        checkMultiplicationCompatibility(other.getRows(), other.getCols());
-        Matrix<T> newMatrix(rows, other.getCols());
+        checkMultiplicationCompatibility(other.rows, other.cols);
+        std::vector<T> newMat(rows * other.cols);
         for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < other.getCols(); ++j) {
+            for (int j = 0; j < other.cols; ++j) {
                 T sum = 0;
                 for (int k = 0; k < cols; ++k) {
-                    sum += getElement(i, k) * other.getElement(k, j);
+                    sum += mat[i * cols + k] * other.mat[k * other.cols + j];
                 }
-                newMatrix.getElement(i, j) = sum;
+                newMat[i * other.cols + j] = sum;
             }
         }
-        rows = newMatrix.rows;
-        cols = newMatrix.cols;
-        mat = newMatrix.mat;
+        cols = other.cols;
+        mat = newMat;
         return *this;
     }
-    
+
     // Transpose the matrix in place: swaps rows and columns
     Matrix& transpose() {
         std::vector<T> newMat(rows * cols);
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
-                newMat[j * rows + i] = getElement(i, j);
+                newMat[j * rows + i] = mat[i * cols + j];
             }
         }
         std::swap(rows, cols);
@@ -260,9 +291,9 @@ public:
 
     // Perform LU decomposition: returns (L, U, P, swapCount) where PA = LU
     std::tuple<Matrix<T>, Matrix<T>, Matrix<T>, int> LU() const {
-        checkSquare();
+        // checkSquare();
 
-        Matrix<T> lower(rows, cols), upper(rows, cols);
+        Matrix<T> lower(rows, rows), upper(rows, cols);
         std::vector<int> perm(rows);
         std::vector<T> tempMat = mat;
         int swapCount = 0;
@@ -270,7 +301,7 @@ public:
         // Initialize permutation vector and set L diagonal to 1
         for (int i = 0; i < rows; ++i) {
             perm[i] = i;
-            lower.mat[i * cols + i] = 1;
+            lower.mat[i * rows + i] = 1;
         }
 
         for (int i = 0; i < rows; ++i) {
@@ -294,15 +325,15 @@ public:
             // Check for singular or near-singular matrix
             T pivot = tempMat[perm[i] * cols + i];
             if (std::abs(pivot) < 1e-10) {
-                throw std::runtime_error("LU decomposition failed: Matrix is singular or near-singular (pivot near zero at position " +
-                                            std::to_string(i) + ")");
+                throw std::runtime_error("LU decomposition failed: Matrix is singular or near-singular (pivot near zero at position "
+                                        + std::to_string(i) + ")");
             }
 
             // Compute U's row i
             for (int j = i; j < cols; ++j) {
                 T sum = 0;
                 for (int k = 0; k < i; ++k) {
-                    sum += lower.mat[i * cols + k] * upper.mat[k * cols + j];
+                    sum += lower.mat[i * rows + k] * upper.mat[k * cols + j];
                 }
                 upper.mat[i * cols + j] = tempMat[perm[i] * cols + j] - sum;
             }
@@ -311,16 +342,16 @@ public:
             for (int j = i + 1; j < rows; ++j) {
                 T sum = 0;
                 for (int k = 0; k < i; ++k) {
-                    sum += lower.mat[j * cols + k] * upper.mat[k * cols + i];
+                    sum += lower.mat[j * rows + k] * upper.mat[k * cols + i];
                 }
-                lower.mat[j * cols + i] = (tempMat[perm[j] * cols + i] - sum) / upper.mat[i * cols + i];
+                lower.mat[j * rows + i] = (tempMat[perm[j] * cols + i] - sum) / upper.mat[i * cols + i];
             }
         }
 
         // Create permutation matrix P
-        Matrix<T> permMat(rows, cols);
+        Matrix<T> permMat(rows, rows);
         for (int i = 0; i < rows; ++i) {
-            permMat.getElement(i, perm[i]) = 1.0;
+            permMat.mat[i * rows + perm[i]] = 1.0;
         }
 
         return std::make_tuple(lower, upper, permMat, swapCount);
@@ -381,14 +412,93 @@ public:
         
         return X;
     }
+    
+    // Inner Product of i and j column of this Matrix
+    T innerProduct(int i, int j) const {
+        checkBounds(0, i);
+        checkBounds(0, j);
+
+        T result = 0;
+
+        for(int k = 0; k < rows; ++k) {
+            result += mat[k * cols + i] * mat[k * cols + j];
+        }
+        return result;
+    }
+
+    // Inner Product of i Column of this and j Column of other Matrix
+    T innerProduct(const Matrix& other, int i, int j) const {
+        if(rows != other.rows) {
+            throw std::invalid_argument("Number of Elements in both vectors are different (For Inner Product): " 
+                                        + std::to_string(rows) + " vs. " + std::to_string(other.rows));
+        }
+        checkBounds(0, i);
+        other.checkBounds(0, j);
+
+        T result = 0;
+
+        for(int k = 0; k < rows; ++k) {
+            result += mat[k * cols + i] * other.mat[k * cols + j];
+        }
+        return result;
+    }
+    
+    T innerProduct(const std::vector<T>& vec1, const std::vector<T>& vec2) {
+        if(vec1.size() != vec2.size()) {
+            throw std::invalid_argument("Number of Elements in both vectors are different (For Inner Product): " 
+                                        + std::to_string(vec1.size()) + " vs. " + std::to_string(vec2.size()));
+        }
+        
+        T result = 0;
+        
+        for(size_t i = 0; i < vec1.size(); ++i) {
+            result += vec1[i] * vec2[i];
+        }
+        
+        return result;
+    }
+    
+    std::tuple<Matrix<T>, Matrix<T>> QR() {
+        checkSquare();
+        
+        std::vector<std::vector<T>> Rvec(cols, std::vector<T>(cols, 0));
+        std::vector<std::vector<T>> v;
+        std::vector<std::vector<T>> QT(rows, std::vector<T>(cols));
+        
+        for(int i = 0; i < cols; ++i) {
+            v.push_back(getCol(i));
+        }
+        
+        for(int i = 0; i < cols; ++i) {
+            Rvec[i][i] = sqrt(innerProduct(v[i], v[i]));
+            
+            for(int j = 0; j < rows; ++j) {
+                QT[i][j] = v[i][j] / Rvec[i][i];
+            }
+            
+            for(int k = i + 1; k < cols; ++k) {
+                Rvec[i][k] = innerProduct(QT[i], v[k]);
+                
+                for(int j = 0; j < rows; ++j) {
+                    v[k][j] -= Rvec[i][k] * QT[i][j];
+                }
+            }
+        }
+        
+        Matrix<T> R(Rvec);
+        Matrix<T> Q(QT);
+        Q.transpose();
+        
+        return std::make_tuple(R, Q);
+    }
 };
 
 // Non-member scalar multiplication: scale * matrix
 template<typename T>
 Matrix<T> operator*(const T& scale, const Matrix<T>& mat) {
-    Matrix<T> newMatrix(mat.getRows(), mat.getCols());
+    Matrix<T> newMatrix(mat.getRows(), mat.cols);
     for (int i = 0; i < mat.getRows(); ++i) {
-        for (int j = 0; j < mat.getCols(); ++j) {
+        for (int j = 0; j < mat.cols; ++j) {
             newMatrix.getElement(i, j) = scale * mat.getElement(i, j);
         }
     }
