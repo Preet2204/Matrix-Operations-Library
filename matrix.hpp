@@ -565,12 +565,6 @@ std::ostream& operator<<(std::ostream& stream, const Matrix<T>& mat) {
     }
     
     return stream;
-    // for (int i = 0; i < mat.getRows(); ++i) {
-    //     for (int j = 0; j < mat.getCols(); ++j) {
-    //         stream << std::setw(10) << mat.getElement(i, j) << ' ';
-    //     }
-    //     stream << '\n';
-    // }
 }
 
 #endif
