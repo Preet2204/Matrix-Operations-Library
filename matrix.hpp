@@ -438,7 +438,7 @@ public:
         T result = 0;
 
         for(int k = 0; k < rows; ++k) {
-            result += mat[k * cols + i] * other.mat[k * cols + j];
+            result += mat[k * cols + i] * other.mat[k * other.cols + j];
         }
         return result;
     }
@@ -489,7 +489,17 @@ public:
         Matrix<T> Q(QT);
         Q.transpose();
         
-        return std::make_tuple(R, Q);
+        return std::make_tuple(Q, R);
+    }
+    
+    // Computes Frobenius Norm of Matrix
+    T frobeniusNorm() const {
+        T result = 0;
+        for(int i = 0; i < rows * cols; ++i) {
+            result += mat[i] * mat[i];
+        }
+        result = std::sqrt(result);
+        return result;
     }
 };
 
@@ -508,13 +518,59 @@ Matrix<T> operator*(const T& scale, const Matrix<T>& mat) {
 // Output operator: prints the matrix to an output stream
 template<typename T>
 std::ostream& operator<<(std::ostream& stream, const Matrix<T>& mat) {
-    for (int i = 0; i < mat.getRows(); ++i) {
-        for (int j = 0; j < mat.getCols(); ++j) {
-            stream << std::setw(10) << mat.getElement(i, j) << ' ';
+    
+    std::vector<size_t> colWidths(mat.getCols(), 0);
+    
+    for(int j = 0; j < mat.getCols(); ++j) {
+        for(int i = 0; i < mat.getRows(); ++i) {
+            
+            std::ostringstream oss;
+            if constexpr (std::is_floating_point_v<T>) {
+                oss << std::fixed << std::setprecision(6) << mat.getElement(i, j);
+            } else {
+                oss << mat.getElement(i, j);
+            }
+            std::string str = oss.str();
+            
+            if constexpr (std::is_floating_point_v<T>) {
+                str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                if(str.back() == '.') {
+                    str.pop_back();
+                }
+            }
+            colWidths[j] = std::max(colWidths[j], str.length());
+        }
+    }
+    
+    for(int i = 0; i < mat.getRows(); ++i) {
+        for(int j = 0; j < mat.getCols(); ++j) {
+            
+            std::ostringstream oss;
+            if constexpr (std::is_floating_point_v<T>) {
+                oss << std::fixed << std::setprecision(6) << mat.getElement(i, j);
+            } else {
+                oss << mat.getElement(i, j);
+            }
+            std::string str = oss.str();
+            
+            if constexpr (std::is_floating_point_v<T>) {
+                str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                if(str.back() == '.') {
+                    str.pop_back();
+                }
+            }
+            stream << std::left << std::setw(colWidths[j]) << str << " ";
         }
         stream << '\n';
     }
+    
     return stream;
+    // for (int i = 0; i < mat.getRows(); ++i) {
+    //     for (int j = 0; j < mat.getCols(); ++j) {
+    //         stream << std::setw(10) << mat.getElement(i, j) << ' ';
+    //     }
+    //     stream << '\n';
+    // }
 }
 
 #endif
