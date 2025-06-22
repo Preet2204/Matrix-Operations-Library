@@ -293,8 +293,7 @@ Users are encouraged to use `try/catch` blocks to handle these exceptions, espec
 
 
 ## Limitations
-- LU decomposition requires the matrix to be square and non-singular (or not near-singular).
-- Determinant and inverse calculations are under development.
+- Matrix Norms, Eigenvalue and Eigenvector Computations are under development.
 
 ## Contributing
 Contributions are welcome! Please submit issues or pull requests to the GitHub repository. Ensure that your code follows the existing style and includes appropriate tests.
