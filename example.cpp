@@ -93,7 +93,7 @@ int main() {
 
         // Frobenius Norm
         double norm = J.frobeniusNorm();
-        std::cout << "Frobenius Norm of Matrix J: " << norm << "\n";
+        std::cout << "Frobenius Norm of Matrix J: " << norm << "\n\n";
 
         // 6. Exception Handling Example
         std::cout << "=== Exception Handling ===\n";
@@ -108,8 +108,14 @@ int main() {
             Matrix<double> L(2, 3);
             L.determinant(); // Should throw invalid_argument (not square)
         } catch (const std::invalid_argument& e) {
-            std::cout << "Caught expected error: " << e.what() << "\n";
+            std::cout << "Caught expected error: " << e.what() << "\n\n";
         }
+        
+        // 7. Eigenvalue Computation
+        std::cout << "=== Eigenvalue Computation ===\n";
+        Matrix<double> M({{5, 0, 0}, {0, 2, 0}, {0, 0, 4}});
+        std::cout << "M Matrix:\n" << M;
+        std::cout << "Eigenvalue of M = " << M.eigenvalue() << "\n\n";
         
         std::cout << "The End!\n";
 

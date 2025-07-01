@@ -413,7 +413,7 @@ public:
         return X;
     }
     
-    // Inner Product of i and j column of this Matrix
+    // Computes Inner Product of i and j column of this Matrix
     T innerProduct(int i, int j) const {
         checkBounds(0, i);
         checkBounds(0, j);
@@ -426,7 +426,7 @@ public:
         return result;
     }
 
-    // Inner Product of i Column of this and j Column of other Matrix
+    // Computes Inner Product of i Column of this and j Column of other Matrix
     T innerProduct(const Matrix& other, int i, int j) const {
         if(rows != other.rows) {
             throw std::invalid_argument("Number of Elements in both vectors are different (For Inner Product): " 
@@ -443,6 +443,7 @@ public:
         return result;
     }
     
+    // Computes Inner Product of two 1D vector
     T innerProduct(const std::vector<T>& vec1, const std::vector<T>& vec2) {
         if(vec1.size() != vec2.size()) {
             throw std::invalid_argument("Number of Elements in both vectors are different (For Inner Product): " 
@@ -458,6 +459,7 @@ public:
         return result;
     }
     
+    // Computes QR Decomposition of Matrix
     std::tuple<Matrix<T>, Matrix<T>> QR() {
         checkSquare();
         
@@ -484,11 +486,11 @@ public:
                 }
             }
         }
-        
+
         Matrix<T> R(Rvec);
         Matrix<T> Q(QT);
         Q.transpose();
-        
+
         return std::make_tuple(Q, R);
     }
     
@@ -501,6 +503,34 @@ public:
         result = std::sqrt(result);
         return result;
     }
+    
+    // Computes largest Absolute Eigenvalue of the matrix
+    T eigenvalue() const {
+        checkSquare();
+        
+        Matrix<T> X = Matrix(rows, 1);
+        for(int i = 0; i < rows; ++i) X.mat[i] = (double(rand() % 1000) / 1000);
+        // X.getElement(0, 0) = 1; // Initialize X to [1, 0, ..., 0]
+        float tolerance = 1e-10;
+
+        int iter = 1000;
+        while(iter--) {
+            Matrix<T> X2 = *(this) * X;
+            X2 *= 1 / X2.frobeniusNorm();       // Normalize to prevent Overflow
+            if((X2 - X).frobeniusNorm() < tolerance) 
+                break;
+            X = X2;
+        }
+        
+        if (iter <= 0)
+            throw std::runtime_error("Eigenvalue computation did not converge within 1000 iterations.");
+
+        Matrix<T> XT = X;
+        XT.transpose();
+        T eigenvalue = (XT * *(this) * X).mat[0] / (XT * X).mat[0];
+        return eigenvalue;
+    }
+
 };
 
 // Non-member scalar multiplication: scale * matrix
